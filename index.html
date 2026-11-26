@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Maze Lab: learn how pathfinding thinks, then play</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0a;--fg:#fafafa;--mut:#9a9a94;--line:rgba(250,250,250,.08);--acc:#ff6a3d;--r2:12px;--r3:16px;--r4:24px;--out:cubic-bezier(.16,1,.3,1);--spring:cubic-bezier(.34,1.56,.64,1);--in:cubic-bezier(.7,0,.84,0);--pad:clamp(20px,5vw,72px);--sec:clamp(80px,12vh,160px);color-scheme:dark;padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:calc(70px + env(safe-area-inset-top,0px));scrollbar-width:thin;scrollbar-color:#2a2a29 transparent}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 1rem/1.6 "Inter Tight",system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:60}
+body::after{content:"";position:fixed;inset:0;z-index:55;pointer-events:none;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+::selection{background:var(--acc);color:#0a0a0a}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#2a2a29;border-radius:8px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+h1,h2,h3{margin:0;font-weight:400;text-wrap:balance}
+h1,h2{font-family:"Instrument Serif",Georgia,serif;letter-spacing:-.03em;line-height:1.05}
+h2{font-size:clamp(2.2rem,5vw,4.2rem)}
+em{font-style:italic;color:var(--acc)}
+p{margin:0 0 1em;max-width:65ch;color:var(--mut)}
+a{color:inherit;text-decoration:none}
+.no{font:500 .75rem "JetBrains Mono",monospace;color:var(--acc);letter-spacing:.08em;margin-bottom:18px}
+.bar{position:fixed;inset:0 0 auto;height:2px;background:var(--acc);transform:scaleX(0);transform-origin:left;z-index:70}
+.cur{position:fixed;left:0;top:0;width:16px;height:16px;border:1.5px solid var(--acc);border-radius:50%;pointer-events:none;z-index:70;opacity:0}
+@media(pointer:coarse){.cur{display:none}}
+nav{position:fixed;inset:0 0 auto;z-index:40;display:flex;justify-content:space-between;align-items:center;padding:calc(16px + env(safe-area-inset-top,0px)) var(--pad) 16px;background:linear-gradient(var(--bg),transparent)}
+nav b{font:400 1.4rem "Instrument Serif",serif;letter-spacing:-.02em}
+nav div{display:flex;gap:clamp(16px,3vw,36px)}
+.nl{position:relative;font:500 .85rem "Inter Tight",sans-serif}
+.nl::after{content:"";position:absolute;inset:auto 0 -4px;height:1px;background:currentColor;clip-path:inset(0 100% 0 0);transition:clip-path .45s var(--out)}
+.nl:hover::after{clip-path:inset(0)}
+.w{display:inline-block;overflow:hidden;vertical-align:top;padding:0 .06em .16em;margin:0 -.06em}
+.w>span{display:inline-block;transform:translateY(112%);transition:transform .8s var(--out) calc(var(--i)*70ms)}
+.in .w>span,.w.in>span{transform:none}
+.rv{opacity:0;transform:translateY(22px);transition:opacity .6s var(--out) calc(var(--d,0)*80ms),transform .6s var(--out) calc(var(--d,0)*80ms)}
+.rv.in{opacity:1;transform:none}
+.hero{position:relative;min-height:100svh;display:grid;align-items:end;padding:120px var(--pad) clamp(40px,8vh,96px);overflow:hidden}
+#hc{position:absolute;left:0;top:12%;width:100%;opacity:.55;-webkit-mask-image:linear-gradient(transparent,#000 25%,#000 65%,transparent);mask-image:linear-gradient(transparent,#000 25%,#000 65%,transparent)}
+.hin{position:relative;z-index:2;max-width:1100px}
+.hero h1{font-size:clamp(3rem,10.5vw,9.5rem);line-height:1.02;max-width:12ch;margin:14px 0 28px}
+.hero .w>span{transition-duration:.95s}
+.hero p{font-size:clamp(1rem,1.6vw,1.25rem)}
+.mono{font:500 .75rem "JetBrains Mono",monospace;color:var(--mut);letter-spacing:.06em}
+.row{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.btn{font:500 .9rem "Inter Tight",sans-serif;padding:.8em 1.3em;border-radius:999px;border:1px solid rgba(250,250,250,.16);background:transparent;color:var(--fg);cursor:pointer;display:inline-flex;gap:.5em;align-items:center;transition:transform .2s var(--spring),background-color .2s var(--out),color .2s var(--out)}
+.btn:active{transform:scale(.97)}
+.btn.gh:hover{background:rgba(250,250,250,.07)}
+.pr{background:var(--acc);color:#0a0a0a;border-color:transparent}
+.mag{translate:0 0;transition:translate var(--td,.6s) var(--te,var(--spring)),transform .2s var(--spring),background-color .2s var(--out)}
+.ar{display:inline-block;transition:transform .25s var(--spring)}
+.btn:hover .ar{transform:translateX(4px)}
+.mq{overflow:hidden;border-block:1px solid var(--line);padding:18px 0}
+.mt{display:flex;width:max-content;animation:mq 40s linear infinite}
+.mq:hover .mt{animation-play-state:paused}
+.ms{display:flex;gap:44px;padding-right:44px;font:italic 400 clamp(1.3rem,2.4vw,1.9rem) "Instrument Serif",serif;color:var(--mut);white-space:nowrap}
+@keyframes mq{to{transform:translateX(-50%)}}
+.sec{display:grid;grid-template-columns:repeat(12,1fr);gap:0 clamp(16px,3vw,48px);padding:var(--sec) max(var(--pad),calc((100vw - 1400px)/2));border-top:1px solid var(--line)}
+.txt{grid-column:1/6;position:sticky;top:18vh;align-self:start}
+.viz{grid-column:6/13}
+.sec.r .txt{grid-column:8/13;grid-row:1}.sec.r .viz{grid-column:1/8;grid-row:1}
+.txt h2{margin-bottom:24px}
+details{margin-top:28px;border-top:1px solid var(--line);padding-top:14px}
+summary{cursor:pointer;font:500 .78rem "JetBrains Mono",monospace;color:var(--fg);list-style:none}
+summary::before{content:"+ ";color:var(--acc)}details[open] summary::before{content:"\2212 "}
+details p{margin-top:10px;font-size:.95rem}
+.cvs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+figure{margin:0;border:1px solid var(--line);border-radius:var(--r3);overflow:hidden;background:#0d0d0d}
+figcaption{display:flex;justify-content:space-between;gap:8px;padding:10px 14px;font:500 .75rem "JetBrains Mono",monospace;color:var(--mut)}
+figcaption b{color:var(--fg);font-weight:500}
+canvas{display:block;width:100%}
+.ctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:16px}
+.ctl label{font:500 .78rem "JetBrains Mono",monospace;color:var(--mut);display:flex;gap:8px;align-items:center}
+input[type=range],input[type=checkbox]{accent-color:var(--acc)}
+select{background:#111;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit}
+.cap{margin:14px 0 0;min-height:3.2em;font-size:.95rem;color:var(--fg)}
+.sqw{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sqw>div{border:1px solid var(--line);border-radius:var(--r3);background:#0d0d0d;padding:14px;min-height:340px}
+.sqw h3{font:500 .75rem "JetBrains Mono",monospace;color:var(--mut);margin-bottom:12px}
+.stk{display:flex;flex-direction:column-reverse;gap:6px;min-height:290px;justify-content:flex-start}
+.que{display:flex;gap:6px;flex-wrap:nowrap;align-items:flex-start;overflow:hidden;min-height:56px}
+.it{width:48px;height:48px;flex:none;display:grid;place-items:center;border:1px solid rgba(250,250,250,.2);border-radius:var(--r2);font:500 1rem "JetBrains Mono",monospace;opacity:0;transform:translate(var(--fx,0),var(--fy,0));transition:transform .3s var(--in),opacity .25s var(--in)}
+.stk .it{--fy:-30px}.que .it{--fx:30px}
+.it.in{opacity:1;transform:none;transition:transform .6s var(--spring),opacity .3s var(--out)}
+.stk .it.out{--fy:-30px;opacity:0;transform:translateY(-30px)}.que .it.out{opacity:0;transform:translateX(-30px)}
+.stk .it:last-child:not(.out),.que .it:first-child:not(.out){border-color:var(--acc);color:var(--acc)}
+.hd{padding:var(--sec) var(--pad) 40px;border-top:1px solid var(--line);max-width:1400px;margin:0 auto}
+.gm{display:grid;grid-template-columns:repeat(12,1fr);gap:24px;padding:0 var(--pad) var(--sec);max-width:1400px;margin:0 auto}
+.gv{grid-column:1/9}.gs{grid-column:9/13;display:grid;gap:12px;align-content:start}
+#gc{border:1px solid var(--line);border-radius:var(--r3);background:#0d0d0d;touch-action:none;cursor:crosshair}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:var(--r3);padding:18px 20px;background:#0f0f0f;transition:transform .5s var(--out)}
+.card b{display:block;font:400 clamp(1.8rem,3.2vw,2.8rem)/1 "Instrument Serif",serif;letter-spacing:-.03em;margin-bottom:6px}
+.card span{font:500 .72rem "JetBrains Mono",monospace;color:var(--mut);line-height:1.4;display:block}
+.sh{position:absolute;inset:-50%;background:radial-gradient(circle,rgba(255,255,255,.09),transparent 40%);opacity:0;transition:opacity .3s var(--out);pointer-events:none}
+.gs h3{font:500 .75rem "JetBrains Mono",monospace;color:var(--mut);margin-top:8px}
+.big{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:0 var(--pad) var(--sec);max-width:1400px;margin:0 auto}
+.big .card{padding:26px}
+.big .card b{font-size:clamp(3rem,6vw,5rem)}
+footer{border-top:1px solid var(--line);padding:40px var(--pad) 56px;font-size:.85rem;color:var(--mut);max-width:1400px;margin:0 auto}
+footer p{max-width:80ch}
+@media(max-width:900px){.sec{display:block}.txt{position:static;margin-bottom:32px}.gm{display:block}.gs{margin-top:16px}.sqw>div{min-height:300px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}.rv,.w>span{opacity:1!important;transform:none!important}}
+</style>
+</head>
+<body>
+<div class="bar" id="bar"></div><div class="cur" id="cur"></div>
+<nav><b>Maze Lab</b><div><a class="nl" href="#s1">Learn</a><a class="nl" href="#play">Play</a><a class="nl" href="#stats">Numbers</a></div></nav>
+
+<header class="hero">
+<canvas id="hc" aria-hidden="true"></canvas>
+<div class="hin" data-stg>
+<p class="mono">AN INTERACTIVE COMPANION TO A C PROJECT</p>
+<h1 data-split>Mazes, *solved* four ways.</h1>
+<p>See how BFS, DFS, Dijkstra and A* think, one explored cell at a time. Then try to beat them yourself.</p>
+<div class="row"><a class="btn pr mag" href="#s1">Learn how it works <span class="ar">→</span></a><a class="btn gh mag" href="#play">Play the maze</a></div>
+</div>
+</header>
+
+<div class="mq" aria-hidden="true"><div class="mt">
+<div class="ms"><span>breadth-first search</span><span>depth-first search</span><span>Dijkstra</span><span>A*</span><span>stack</span><span>queue</span><span>min-heap</span><span>perfect maze</span><span>braiding</span><span>hill climbing</span></div>
+<div class="ms"><span>breadth-first search</span><span>depth-first search</span><span>Dijkstra</span><span>A*</span><span>stack</span><span>queue</span><span>min-heap</span><span>perfect maze</span><span>braiding</span><span>hill climbing</span></div>
+</div></div>
+
+<main>
+<section class="sec" id="s1"><div class="txt"><p class="no">01</p><h2 data-split>A maze is *a graph*</h2>
+<p class="rv">Every open cell is a dot. Every open passage between two cells is a line. Solving the maze means finding a path through that graph, so everything we know about graphs applies.</p>
+<details class="rv"><summary>Check yourself</summary><p>What do the dots and lines stand for? Dots are open cells and lines are open passages between them.</p></details></div>
+<div class="viz lab" data-lab="graph" data-seed="12"></div></section>
+
+<section class="sec r" id="s2"><div class="txt"><p class="no">02</p><h2 data-split>Stack *or* queue?</h2>
+<p class="rv">Both hold the cells a search has found but not yet explored. A stack gives back the <strong>newest</strong> item. A queue gives back the <strong>oldest</strong>. That single choice is the whole difference between DFS and BFS.</p>
+<details class="rv"><summary>Check yourself</summary><p>Which one finds the shortest path? The queue (BFS), because it spreads out evenly from the start.</p></details></div>
+<div class="viz" id="sq"></div></section>
+
+<section class="sec" id="s3"><div class="txt"><p class="no">03</p><h2 data-split>How a maze *grows*</h2>
+<p class="rv">A walker moves to a random unvisited room and knocks down the wall between. When it is stuck, it steps back along its stack. Every room is joined exactly once, so there is exactly one route between any two rooms.</p>
+<details class="rv"><summary>Check yourself</summary><p>Why is there only one route? Each room joins the maze exactly once, so no loops can form.</p></details></div>
+<div class="viz lab" data-lab="gen" data-seed="31"></div></section>
+
+<section class="sec r" id="s4"><div class="txt"><p class="no">04</p><h2 data-split>BFS *spreads*, DFS *dives*</h2>
+<p class="rv">BFS uses a queue: it explores in rings and always finds the shortest path. DFS uses a stack: it follows one corridor to the end before trying another. With one route through the maze both find it, but DFS can wander far more.</p>
+<details class="rv"><summary>Check yourself</summary><p>Why might DFS explore more cells? It commits to a corridor and may follow a long wrong branch before backing up.</p></details></div>
+<div class="viz lab" data-lab="cmp" data-algos="bfs,dfs" data-seed="99" data-hint="Press play: both searches start from the green dot. Each step is one explored cell."></div></section>
+
+<section class="sec" id="s5"><div class="txt"><p class="no">05</p><h2 data-split>A* makes *a guess*</h2>
+<p class="rv">Dijkstra explores by distance travelled. A* adds a guess of the distance left: the straight-line grid distance to the goal. Drag the loops slider. With more ways through, the guess gets sharper and A* skips more of the maze.</p>
+<details class="rv"><summary>Check yourself</summary><p>When does A* help least? When the real route winds a lot, because the straight-line guess is far too optimistic.</p></details></div>
+<div class="viz lab" data-lab="cmp" data-algos="dij,astar" data-loops data-seed="8" data-hint="Press play, or drag the loops slider to see the result at once."></div></section>
+</main>
+
+<section id="play"><div class="hd"><p class="no">06</p><h2 data-split>Now *you* try</h2><p class="rv" style="margin-top:20px">Click the maze, then use the arrow keys or WASD (swipe on a phone). Turn on the race to see A* search while you walk.</p></div>
+<div class="gm"><div class="gv">
+<canvas id="gc" tabindex="0" aria-label="Maze game. Use arrow keys or WASD to move from the white dot to the orange dot."></canvas>
+<p class="cap" id="gmsg" aria-live="polite"></p>
+<div class="ctl"><button class="btn pr mag" type="button" data-g="new">New maze</button><button class="btn gh" type="button" data-g="day">Daily maze</button><button class="btn gh" type="button" data-g="hint">Hint</button>
+<label><input type="checkbox" id="race"> Race A*</label><label>Loops <select id="lp"><option value="0">none</option><option value="25">some</option><option value="50">many</option></select></label></div></div>
+<aside class="gs"><h3>THIS GAME</h3><div class="g2"><div class="card"><b id="gt">0.0s</b><span>time</span></div><div class="card"><b id="gm">0</b><span>moves</span></div><div class="card"><b id="go">0</b><span>steps off the shortest route</span></div><div class="card"><b id="gh">0</b><span>hints used</span></div></div>
+<h3>YOUR RECORD (SAVED IN THIS BROWSER)</h3><div class="g2"><div class="card tilt"><b id="sg">0</b><span>games finished</span></div><div class="card tilt"><b id="sb">–</b><span>best time</span></div><div class="card tilt"><b id="se">–</b><span>average efficiency</span></div><div class="card tilt"><b id="sm">0</b><span>total moves</span></div></div>
+<button class="btn gh" type="button" data-g="reset" style="justify-self:start">Reset record</button></aside></div></section>
+
+<section id="stats"><div class="hd"><p class="no">07</p><h2 data-split>The project in *numbers*</h2><p class="rv" style="margin-top:20px">Measured in the original C program. The full proofs and tests are in the project report.</p></div>
+<div class="big" data-stg>
+<div class="card tilt"><b data-n="11" data-s="%">0</b><span>fewer cells explored by A* than BFS in perfect mazes</span></div>
+<div class="card tilt"><b data-n="40" data-s="%">0</b><span>fewer when the maze has loops</span></div>
+<div class="card tilt"><b data-n="209">0</b><span>cells explored by A* in an evolved worst-case maze (every open cell)</span></div>
+<div class="card tilt"><b data-n="0">0</b><span>memory or undefined-behaviour errors in 24 sanitizer runs</span></div>
+</div></section>
+
+<footer><p>By Ajay Dangi and Aditya More. Mentor: Mr. Amit Kumar Manjhvar.</p><p>This page re-implements the algorithms of the C program in JavaScript so they run in your browser. Mazes here are generated with a different random number generator from the C version, so seeds do not match the report.</p></footer>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const RM=matchMedia('(prefers-reduced-motion:reduce)').matches,FINE=matchMedia('(pointer:fine)').matches;
+const W=31,H=15,N=W*H,S=W+1,E=(H-2)*W+W-2,NM={bfs:'BFS',dfs:'DFS',dij:'Dijkstra',astar:'A*'};
+const rnd=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+
+function gen(seed,braid=0){
+ const r=rnd(seed),g=new Uint8Array(N).fill(1),st=[S],ev=[],D=[1,-1,W,-W];g[S]=0;
+ while(st.length){const c=st[st.length-1],x=c%W,y=c/W|0,o=[];
+  for(const d of D){const nx=x+(d===1?2:d===-1?-2:0),ny=y+(d===W?2:d===-W?-2:0);if(nx>0&&nx<W-1&&ny>0&&ny<H-1&&g[ny*W+nx])o.push(d)}
+  if(!o.length){st.pop();ev.push([-1,st.length]);continue}
+  const d=o[r()*o.length|0];g[c+d]=0;g[c+2*d]=0;st.push(c+2*d);ev.push([c+d,st.length],[c+2*d,st.length])}
+ if(braid){const b=rnd(seed^0x9e37);for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const i=y*W+x;if((x&1)!==(y&1)&&g[i]&&b()*100<braid)g[i]=0}}
+ return{g,ev}}
+
+function solve(a,g,s=S,t=E){
+ const dist=new Int32Array(N).fill(-1),par=new Int32Array(N).fill(-1),cl=new Uint8Array(N),q=new Int32Array(N),ord=[],open=[s];
+ const h=c=>Math.abs(c%W-t%W)+Math.abs((c/W|0)-(t/W|0));let seq=1;dist[s]=0;
+ while(open.length){let bi=0,bk=1e12;
+  for(let i=0;i<open.length;i++){const c=open[i],k=a==='bfs'?q[c]:a==='dfs'?-q[c]:a==='dij'?dist[c]*1e4+q[c]:(dist[c]+h(c))*1e4+q[c];if(k<bk){bk=k;bi=i}}
+  const c=open[bi];open[bi]=open[open.length-1];open.pop();cl[c]=1;ord.push(c);if(c===t)break;
+  for(const d of [1,-1,W,-W]){const n=c+d;if(g[n]||cl[n])continue;const nd=dist[c]+1;
+   if(a==='bfs'||a==='dfs'){if(dist[n]>=0)continue;dist[n]=nd;par[n]=c;q[n]=seq++;open.push(n)}
+   else if(dist[n]<0||nd<dist[n]){const was=dist[n]>=0;dist[n]=nd;par[n]=c;if(!was){q[n]=seq++;open.push(n)}}}}
+ const path=[];for(let c=t;c>=0;c=par[c])path.push(c);path.reverse();
+ return{ord,path,n:ord.length,len:path.length-1}}
+
+const C={w:'#1d1d1c',o:'#0d0d0d',x:'#6f6f6a',p:'#ff6a3d'};
+function draw(cv,g,o={}){
+ const d=Math.min(devicePixelRatio||1,2),w=cv.clientWidth;if(!w)return;const cs=w/W,h=cs*H;
+ if(cv._w!==w){cv.width=Math.round(w*d);cv.height=Math.round(h*d);cv.style.height=h+'px';cv._w=w}
+ const x=cv.getContext('2d'),gr=o.graph;x.setTransform(d,0,0,d,0,0);
+ for(let i=0;i<N;i++){x.fillStyle=g[i]?(gr?'#121211':C.w):o.path&&o.path.has(i)?C.p:o.hint&&o.hint.has(i)?'rgba(255,106,61,.55)':o.tr&&o.tr.has(i)?'#cfcfca':o.ex&&o.ex[i]?C.x:C.o;x.fillRect((i%W)*cs,(i/W|0)*cs,cs+.5,cs+.5)}
+ const dot=(i,c,r)=>{x.fillStyle=c;x.beginPath();x.arc((i%W+.5)*cs,((i/W|0)+.5)*cs,cs*r,0,6.283);x.fill()};
+ if(gr){x.strokeStyle='rgba(250,250,250,.75)';x.lineWidth=cs*.14;x.beginPath();
+  for(let i=0;i<N;i++){if(g[i])continue;const a=i%W&1,b=(i/W|0)&1;if(a!==b){const k=a?W:1;x.moveTo((i-k)%W*cs+cs/2,((i-k)/W|0)*cs+cs/2);x.lineTo((i+k)%W*cs+cs/2,((i+k)/W|0)*cs+cs/2)}}x.stroke();
+  for(let i=0;i<N;i++)if(!g[i]&&(i%W&1)&&((i/W|0)&1))dot(i,'#fafafa',.3)}
+ dot(S,'#fafafa',.36);dot(E,C.p,.4);if(o.pl!=null)dot(o.pl,'#fafafa',.42)}
+
+const REDRAW=[];addEventListener('resize',()=>requestAnimationFrame(()=>REDRAW.forEach(f=>f())));
+
+function mkLab(root){
+ const m=root.dataset.lab,al=m==='cmp'?root.dataset.algos.split(','):[],lp=root.hasAttribute('data-loops');
+ let seed=+root.dataset.seed||7,braid=0,idx=0,play=false,last=0,rate=75,show=false,D,lim=0;
+ const B=(a,t,c)=>`<button type="button" class="btn ${c||'gh'}" data-a="${a}">${t}</button>`;
+ root.insertAdjacentHTML('beforeend',`<div class="cvs">${(al.length?al:['']).map(a=>`<figure><figcaption><b>${NM[a]||'Maze'}</b><span></span></figcaption><canvas></canvas></figure>`).join('')}</div><div class="ctl">${m==='graph'?B('g','Show the graph','pr mag'):B('p','Play <span class="ar">→</span>','pr mag')}${m==='cmp'?B('s','Step'):''}${B('n','New maze')}${m==='graph'?'':'<label>Speed <input type="range" min="1" max="8" value="3" data-a="v"></label>'}${lp?'<label>Loops <input type="range" min="0" max="100" step="5" value="0" data-a="l"><output>0%</output></label>':''}</div><p class="cap" aria-live="polite"></p>`);
+ const cv=$$('canvas',root),st=$$('figcaption span',root),cap=$('.cap',root),pb=$('[data-a=p]',root);
+ const build=()=>{const r=gen(seed,braid);D={g:r.g,ev:r.ev,s:al.map(a=>solve(a,r.g))};lim=m==='gen'?r.ev.length:m==='cmp'?Math.max(...D.s.map(s=>s.n)):0};
+ const sum=()=>{const[a,b]=D.s;if(al[0]==='bfs')return`BFS looked at ${a.n} cells, DFS at ${b.n}.`+(a.len===b.len?` Both found a path of ${a.len} steps.`:` DFS found a longer path: ${b.len} steps against ${a.len}.`);const p=Math.round((a.n-b.n)*100/a.n);return`Dijkstra explored ${a.n} cells, A* ${b.n}`+(p>0?`: ${p}% fewer.`:'. No saving on this maze.')};
+ function render(){
+  if(m==='graph'){draw(cv[0],D.g,{graph:show});cap.textContent=show?'Dots are cells, lines are passages. This maze never loops, so its graph is a tree.':'Press the button to see the maze as a graph.';return}
+  if(m==='gen'){const c=new Uint8Array(N).fill(1),k=Math.min(Math.floor(idx),D.ev.length);let dp=1;c[S]=0;for(let i=0;i<k;i++){const[e,s]=D.ev[i];if(e>=0)c[e]=0;dp=s}
+   draw(cv[0],c,{});st[0].textContent='stack depth '+dp;cap.textContent=idx>=lim?'Done: every room is joined exactly once.':'Watch the stack grow, then shrink as the walker backtracks.';return}
+  const k0=Math.floor(idx);
+  D.s.forEach((s,i)=>{const k=Math.min(k0,s.n),ex=new Uint8Array(N);for(let j=0;j<k;j++)ex[s.ord[j]]=1;draw(cv[i],D.g,{ex,path:k>=s.n?new Set(s.path):null});st[i].textContent=k+' explored'+(k>=s.n?' · path '+s.len:'')});
+  cap.textContent=k0>=lim?sum():root.dataset.hint||''}
+ const label=()=>{if(pb)pb.innerHTML=play?'Pause':'Play <span class="ar">→</span>'};
+ const stop=()=>{play=false;label()};
+ function tick(t){if(!play)return;idx+=rate*Math.min(.05,(t-last)/1000);last=t;if(idx>=lim){idx=lim;stop()}render();if(play)requestAnimationFrame(tick)}
+ root.addEventListener('click',e=>{const b=e.target.closest('button[data-a]');if(!b)return;const a=b.dataset.a;
+  if(a==='g'){show=!show;b.textContent=show?'Hide the graph':'Show the graph';render()}
+  if(a==='p'){if(play){stop();return}if(idx>=lim)idx=0;if(RM){idx=lim;render();return}play=true;last=performance.now();label();requestAnimationFrame(tick)}
+  if(a==='s'){idx=Math.min(lim,Math.floor(idx)+1);stop();render()}
+  if(a==='n'){seed=Math.random()*1e6|0;build();idx=0;stop();render()}});
+ root.addEventListener('input',e=>{const t=e.target,a=t.dataset.a;if(a==='v')rate=25*t.value;if(a==='l'){braid=+t.value;t.nextElementSibling.textContent=braid+'%';build();idx=lim;stop();render()}});
+ build();render();REDRAW.push(render)}
+$$('.lab').forEach(mkLab);
+
+(function(){const r=$('#sq');if(!r)return;const stk=[],que=[];let n=0;
+ r.innerHTML='<div class="sqw"><div><h3>STACK: newest out</h3><div class="stk"></div></div><div><h3>QUEUE: oldest out</h3><div class="que"></div></div></div><div class="ctl"><button class="btn pr mag" type="button" data-a="add">Add item <span class="ar">→</span></button><button class="btn gh" type="button" data-a="out">Take one out</button></div><p class="cap" aria-live="polite">Add a few items, then take one out of each.</p>';
+ const A=$('.stk',r),Q=$('.que',r),cap=$('.cap',r);
+ const mk=(c,t)=>{const e=document.createElement('div');e.className='it';e.textContent=t;c.append(e);requestAnimationFrame(()=>requestAnimationFrame(()=>e.classList.add('in')))};
+ const rm=e=>{e.classList.add('out');setTimeout(()=>e.remove(),320)};
+ r.addEventListener('click',e=>{const a=e.target.closest('button[data-a]')?.dataset.a;if(!a)return;
+  if(a==='add'){if(stk.length>=6){cap.textContent='That is enough for the demo. Take some out.';return}const t='ABCDEFGHIJ'[n++%10];stk.push(t);que.push(t);mk(A,t);mk(Q,t);cap.textContent='Added '+t+' to both.'}
+  else{if(!stk.length){cap.textContent='Nothing to take out yet.';return}const s=stk.pop(),q=que.shift();rm(A.lastElementChild);rm(Q.firstElementChild);cap.textContent=`The stack gave back ${s}, the newest. The queue gave back ${q}, the oldest.`}})})();
+
+(function(){const hc=$('#hc');let seed=Math.random()*1e6|0,vis=true;new IntersectionObserver(e=>{vis=e[0].isIntersecting}).observe(hc);
+ function next(){const r=gen(seed++),sol=solve('astar',r.g),ne=sol.ord.length,tc=r.ev.length/170,ts=ne/130;
+  if(RM){const ex=new Uint8Array(N);sol.ord.forEach(i=>ex[i]=1);draw(hc,r.g,{ex,path:new Set(sol.path)});return}
+  const t0=performance.now();
+  (function f(t){const e=(t-t0)/1000;if(e>tc+ts+2.4)return next();
+   if(vis){if(e<tc){const c=new Uint8Array(N).fill(1),k=Math.floor(e*170);c[S]=0;for(let i=0;i<k;i++)if(r.ev[i][0]>=0)c[r.ev[i][0]]=0;draw(hc,c,{})}
+    else{const k=Math.min(ne,Math.floor((e-tc)*130)),ex=new Uint8Array(N);for(let j=0;j<k;j++)ex[sol.ord[j]]=1;draw(hc,r.g,{ex,path:k>=ne?new Set(sol.path):null})}}
+   requestAnimationFrame(f)})(t0)}
+ next();addEventListener('resize',()=>{if(RM)next()})})();
+
+(function(){const cv=$('#gc');let G,iv;const Z={games:0,best:0,eff:0,moves:0};let ST;
+ try{ST={...Z,...JSON.parse(localStorage.getItem('mazelab'))}}catch(e){ST={...Z}}
+ const sv=()=>{try{localStorage.setItem('mazelab',JSON.stringify(ST))}catch(e){}},T=id=>$('#'+id),msg=t=>{T('gmsg').textContent=t};
+ function stats(){T('sg').textContent=ST.games;T('sb').textContent=ST.best?ST.best.toFixed(1)+'s':'–';T('se').textContent=ST.games?Math.round(ST.eff/ST.games)+'%':'–';T('sm').textContent=ST.moves}
+ function live(){const t=G.t0?((G.done||performance.now())-G.t0)/1000:0;T('gt').textContent=t.toFixed(1)+'s';T('gm').textContent=G.mv;T('go').textContent=G.off;T('gh').textContent=G.hn}
+ function paint(){let ex=null;if(G.race&&G.ai){ex=new Uint8Array(N);for(let i=0;i<Math.min(G.ai,G.sol.n);i++)ex[G.sol.ord[i]]=1}draw(cv,G.g,{ex,tr:G.tr,hint:G.hint,pl:G.p,path:G.done?G.on:null})}
+ function ng(seed){clearInterval(iv);const g=gen(seed,+T('lp').value).g,sol=solve('astar',g);
+  G={g,sol,on:new Set(sol.path),p:S,mv:0,off:0,hn:0,tr:new Set([S]),hint:new Set(),t0:0,done:0,ai:0,race:T('race').checked,seed};
+  iv=setInterval(()=>{if(!G.t0||G.done)return;if(G.race&&G.ai<G.sol.n){G.ai++;if(G.ai===G.sol.n)msg('A* reached the goal after exploring '+G.sol.n+' cells. You can still finish!')}live();paint()},120);
+  msg('Shortest route: '+sol.len+' steps. Click the maze, then use the arrow keys or WASD.');live();paint();cv.focus({preventScroll:true})}
+ function mv(d){if(G.done)return;const n=G.p+d;if(G.g[n])return;if(!G.t0)G.t0=performance.now();G.p=n;G.mv++;G.hint.clear();if(!G.on.has(n))G.off++;G.tr.add(n);
+  if(n===E){G.done=performance.now();const t=(G.done-G.t0)/1000,ef=Math.min(100,Math.round(G.sol.len*100/G.mv));ST.games++;ST.moves+=G.mv;ST.eff+=ef;if(!ST.best||t<ST.best)ST.best=t;sv();stats();
+   msg(`Solved in ${t.toFixed(1)}s with ${G.mv} moves. Efficiency ${ef}%: the shortest path is ${G.sol.len} steps, and A* had to explore ${G.sol.n} cells.`)}
+  live();paint()}
+ const K={ArrowUp:-W,ArrowDown:W,ArrowLeft:-1,ArrowRight:1,w:-W,s:W,a:-1,d:1,W:-W,S:W,A:-1,D:1};
+ cv.addEventListener('keydown',e=>{const d=K[e.key];if(d){e.preventDefault();mv(d)}});
+ let tx,ty;cv.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
+ cv.addEventListener('touchend',e=>{const t=e.changedTouches[0],dx=t.clientX-tx,dy=t.clientY-ty;if(Math.max(Math.abs(dx),Math.abs(dy))<24)return;mv(Math.abs(dx)>Math.abs(dy)?(dx>0?1:-1):(dy>0?W:-W))});
+ $('#play').addEventListener('click',e=>{const a=e.target.closest('[data-g]')?.dataset.g;if(!a)return;
+  if(a==='new')ng(Math.random()*1e6|0);if(a==='day')ng(Math.floor(Date.now()/864e5));
+  if(a==='hint'&&!G.done){G.hint=new Set(solve('astar',G.g,G.p).path.slice(1,6));G.hn++;live();paint()}
+  if(a==='reset'){ST={...Z};sv();stats()}});
+ T('race').onchange=()=>ng(G.seed);T('lp').onchange=()=>ng(Math.random()*1e6|0);
+ stats();ng(Math.random()*1e6|0);REDRAW.push(paint)})();
+
+/* motion: reveals, counters, scroll, cursor, magnets, tilt */
+$$('[data-split]').forEach(el=>{const ws=el.textContent.trim().split(/\s+/);el.setAttribute('aria-label',ws.join(' ').replace(/\*/g,''));
+ el.innerHTML=ws.map((w,i)=>{const m=w.match(/^\*(.+?)\*(.*)$/);return`<span class="w" aria-hidden="true"><span style="--i:${i}">${m?`<em>${m[1]}</em>${m[2]}`:w}</span></span>`}).join(' ')});
+$$('[data-stg]').forEach(p=>[...p.children].forEach((c,i)=>{if(c.hasAttribute('data-split'))return;c.classList.add('rv');c.style.setProperty('--d',i)}));
+function count(el){const to=+el.dataset.n,s=el.dataset.s||'';if(RM){el.textContent=to+s;return}const t0=performance.now();(function f(t){const k=Math.min(1,(t-t0)/1500),e=k===1?1:1-Math.pow(2,-10*k);el.textContent=Math.round(to*e)+s;if(k<1)requestAnimationFrame(f)})(t0)}
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting)return;e.target.classList.add('in');if(e.target.dataset.n!==undefined)count(e.target);io.unobserve(e.target)}),{rootMargin:'0px 0px -100px 0px'});
+$$('.rv,[data-split],[data-n]').forEach(el=>io.observe(el));
+(function(){const bar=$('#bar'),hc=$('#hc');let tk=0;addEventListener('scroll',()=>{if(tk)return;tk=requestAnimationFrame(()=>{tk=0;const y=scrollY,m=document.documentElement.scrollHeight-innerHeight;bar.style.transform=`scaleX(${m>0?y/m:0})`;if(!RM&&y<innerHeight*1.2)hc.style.transform=`translate3d(0,${y*.18}px,0)`})},{passive:true})})();
+if(FINE&&!RM){
+ const c=$('#cur');let x=0,y=0,tx=0,ty=0,s=1,ts=1;
+ addEventListener('pointermove',e=>{tx=e.clientX;ty=e.clientY;c.style.opacity=1;ts=e.target.closest('a,button,canvas,input,select,summary,label')?2.6:1});
+ (function f(){x+=(tx-x)*.18;y+=(ty-y)*.18;s+=(ts-s)*.18;c.style.transform=`translate3d(${x-8}px,${y-8}px,0) scale(${s})`;requestAnimationFrame(f)})();
+ addEventListener('pointermove',e=>$$('.mag').forEach(b=>{const r=b.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),near=Math.abs(dx)<r.width/2+20&&Math.abs(dy)<r.height/2+20;
+  b.style.setProperty('--td',near?'.18s':'.6s');b.style.setProperty('--te',near?'var(--out)':'var(--spring)');b.style.translate=near?`${dx*.28}px ${dy*.28}px`:''}));
+ $$('.tilt').forEach(c=>{const sh=document.createElement('i');sh.className='sh';c.append(sh);
+  c.addEventListener('pointermove',e=>{const r=c.getBoundingClientRect(),px=(e.clientX-r.left)/r.width-.5,py=(e.clientY-r.top)/r.height-.5;c.style.transform=`perspective(700px) rotateX(${-py*7}deg) rotateY(${px*7}deg)`;sh.style.transform=`translate(${px*60}%,${py*60}%)`;sh.style.opacity=1});
+  c.addEventListener('pointerleave',()=>{c.style.transform='';sh.style.opacity=0})})}
+</script>
+</body>
+</html>
