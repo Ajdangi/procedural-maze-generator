@@ -1,0 +1,6 @@
+# SHA-256 checksums for maze5 version 1.0.0
+# Verify:  sha256sum -c --ignore-missing SHA256SUMS.txt   (run in the folder that holds the files)
+08d33630caa76b15e5262f0ed6767177818a6d332530501c2d56a768a13f07a3  maze5-linux-x64
+0995b990b95508cab85accb0400cd4927aaef091017b85ffd5f0da158bb85a73  maze5-windows-x64.exe
+93cbff2c9f7af2f7b1e8f6c060ef1eed557a1b2a4f2b65ddaeda625d602c4390  maze5-windows-x64.zip
+23ce04feffebde0113ea581df1693b69a418b34448802534ce6ea3b1ab63fd8f  maze5-linux-x64.tar.gz
